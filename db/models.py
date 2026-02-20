@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from sqlalchemy import (
     Column, String, DateTime, JSON, ForeignKey,
-    UniqueConstraint, create_engine
+    UniqueConstraint, Float, create_engine
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
@@ -13,6 +13,14 @@ Base = declarative_base()
 def generate_uuid():
     return str(uuid.uuid4())
 
+class Order(Base):
+    __tablename__ = "orders"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, nullable=False, index=True)
+    amount = Column(Float, nullable=False)
+    city = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 class Segment(Base):
     __tablename__ = "segments"

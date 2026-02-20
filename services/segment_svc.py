@@ -3,6 +3,7 @@
 from db.models import Segment, UserSegmentMembership
 from services.rule_engine import evaluate
 from services.user_stats import UserStatsService
+from sqlalchemy.exc import IntegrityError
 
 
 class SegmentService:
@@ -11,11 +12,16 @@ class SegmentService:
         self.db = db
 
     def create_segment(self, name, description, rules):
-        segment = Segment(name=name, description=description, rules=rules)
-        self.db.add(segment)
-        self.db.commit()
-        self.db.refresh(segment)
-        return segment
+        try:
+            segment = Segment(name=name, description=description, rules=rules)
+            self.db.add(segment)
+            self.db.commit()
+            self.db.refresh(segment)
+            return segment
+        except IntegrityError:
+            self.db.rollback()
+            # return the existing segment instead
+            return self.db.query(Segment).filter(Segment.name == name).first()
 
     def get_all_segments(self):
         return self.db.query(Segment).all()
