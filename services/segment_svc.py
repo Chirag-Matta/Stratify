@@ -33,7 +33,7 @@ class SegmentService:
         matched = []
         for segment in segments:
             if evaluate(segment.rules, stats):
-                matched.append(segment.id)
+                matched.append(segment.segmentID)
 
         # delete old
         self.db.query(UserSegmentMembership)\
@@ -42,7 +42,7 @@ class SegmentService:
 
         # insert new
         for seg_id in matched:
-            self.db.add(UserSegmentMembership(user_id=user_id, segment_id=seg_id))
+            self.db.add(UserSegmentMembership(user_id=user_id, segmentID=seg_id))
 
         self.db.commit()
         return matched

@@ -12,7 +12,7 @@ class ExperimentService:
     def __init__(self, db):
         self.db = db
 
-    def create_experiment(self, name, variants, segment_ids, status="active"):
+    def create_experiment(self, name, variants, segmentIDs, status="active"):
         total_weight = sum(v["weight"] for v in variants)
         if total_weight != 100:
             raise ValueError("Variant weights must sum to 100")
@@ -26,11 +26,11 @@ class ExperimentService:
         self.db.commit()
         self.db.refresh(experiment)
 
-        for seg_id in segment_ids:
+        for seg_id in segmentIDs:
             self.db.add(
                 ExperimentSegment(
-                    experiment_id=experiment.id,
-                    segment_id=seg_id
+                    experimentID=experiment.experimentID,
+                    segmentID=seg_id
                 )
             )
 
@@ -38,7 +38,7 @@ class ExperimentService:
         return experiment
 
     def assign_variant(self, user_id, experiment):
-        key = f"{user_id}:{experiment.id}"
+        key = f"{user_id}:{experiment.experimentID}"
         bucket = int(hashlib.md5(key.encode()).hexdigest(), 16) % 100
 
         cumulative = 0
@@ -51,7 +51,7 @@ class ExperimentService:
         segments = self.db.query(UserSegmentMembership)\
             .filter(UserSegmentMembership.user_id == user_id).all()
 
-        segment_ids = [s.segment_id for s in segments]
+        segmentIDs = [s.segmentID for s in segments]
 
         experiments = self.db.query(Experiment)\
             .filter(Experiment.status == "active").all()
@@ -59,11 +59,11 @@ class ExperimentService:
         results = []
 
         for exp in experiments:
-            target_segments = [es.segment_id for es in exp.segments]
-            if any(s in segment_ids for s in target_segments):
+            target_segments = [es.segmentID for es in exp.segments]
+            if any(s in segmentIDs for s in target_segments):
                 variant = self.assign_variant(user_id, exp)
                 results.append({
-                    "experiment_id": exp.id,
+                    "experimentID": exp.id,
                     "variant": variant
                 })
 

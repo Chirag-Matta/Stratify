@@ -2,6 +2,7 @@ import json
 import os
 import sys
 from dotenv import load_dotenv
+from services.cache import invalidate_user_cache
 load_dotenv()
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -44,6 +45,7 @@ def main():
         try:
             service = SegmentService(db)
             matched_segments = service.refresh_user_segments(user_id)
+            invalidate_user_cache(user_id)  # force fresh computation next request
             print(f"[Consumer] User {user_id} now in segments: {matched_segments}")
         except Exception as e:
             print(f"[Consumer] Error: {e}")

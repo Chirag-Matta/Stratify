@@ -11,25 +11,25 @@ class UserStatsService:
         now = datetime.utcnow()
 
         # Total orders ever
-        total_orders = self.db.query(func.count(Order.id))\
+        total_orders = self.db.query(func.count(order.orderID))\
             .filter(Order.user_id == user_id)\
             .scalar() or 0
 
         # Orders in last 15 days
         cutoff_15 = now - timedelta(days=15)
-        orders_last_15 = self.db.query(func.count(Order.id))\
+        orders_last_15 = self.db.query(func.count(order.orderID))\
             .filter(Order.user_id == user_id, Order.created_at >= cutoff_15)\
             .scalar() or 0
 
         # Orders in last 23 days
         cutoff_23 = now - timedelta(days=23)
-        orders_last_23 = self.db.query(func.count(Order.id))\
+        orders_last_23 = self.db.query(func.count(order.orderID))\
             .filter(Order.user_id == user_id, Order.created_at >= cutoff_23)\
             .scalar() or 0
 
         # Orders in last 12 days
         cutoff_12 = now - timedelta(days=12)
-        orders_last_12 = self.db.query(func.count(Order.id))\
+        orders_last_12 = self.db.query(func.count(order.orderID))\
             .filter(Order.user_id == user_id, Order.created_at >= cutoff_12)\
             .scalar() or 0
 
