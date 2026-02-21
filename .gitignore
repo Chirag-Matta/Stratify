@@ -5,8 +5,8 @@ __pycache__/
 *.pyd
 
 # Virtual Environment
-venv/
-.env/
+myenv/
+.env/ 
 .env
 
 # Database files
