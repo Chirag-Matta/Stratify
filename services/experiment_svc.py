@@ -5,6 +5,8 @@ from db.models import (
     Experiment, ExperimentSegment,
     UserExperimentAssignment, UserSegmentMembership
 )
+from sqlalchemy.exc import IntegrityError
+
 
 
 class ExperimentService:
@@ -17,25 +19,30 @@ class ExperimentService:
         if total_weight != 100:
             raise ValueError("Variant weights must sum to 100")
 
-        experiment = Experiment(
-            name=name,
-            variants=variants,
-            status=status
-        )
-        self.db.add(experiment)
-        self.db.commit()
-        self.db.refresh(experiment)
-
-        for seg_id in segmentIDs:
-            self.db.add(
-                ExperimentSegment(
-                    experimentID=experiment.experimentID,
-                    segmentID=seg_id
-                )
+        try:
+            experiment = Experiment(
+                name=name,
+                variants=variants,
+                status=status
             )
+            self.db.add(experiment)
+            self.db.commit()
+            self.db.refresh(experiment)
 
-        self.db.commit()
-        return experiment
+            for seg_id in segmentIDs:
+                self.db.add(
+                    ExperimentSegment(
+                        experimentID=experiment.experimentID,
+                        segmentID=seg_id
+                    )
+                )
+            self.db.commit()
+            return experiment
+
+        except IntegrityError:
+            self.db.rollback()
+            return self.db.query(Experiment).filter(Experiment.name == name).first()
+
 
     def assign_variant(self, user_id, experiment):
         key = f"{user_id}:{experiment.experimentID}"
@@ -63,7 +70,7 @@ class ExperimentService:
             if any(s in segmentIDs for s in target_segments):
                 variant = self.assign_variant(user_id, exp)
                 results.append({
-                    "experimentID": exp.id,
+                    "experimentID": exp.experimentID,
                     "variant": variant
                 })
 
