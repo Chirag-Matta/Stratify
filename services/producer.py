@@ -1,25 +1,25 @@
-# services/kafka_producer.py
-
 import json
 import os
-from kafka import KafkaProducer
-from kafka.errors import KafkaError
+from confluent_kafka import Producer
+from dotenv import load_dotenv
+load_dotenv()
 
 producer = None
 
 def get_producer():
     global producer
     if producer is None:
-        producer = KafkaProducer(
-            bootstrap_servers=os.getenv("KAFKA_SERVERS", "localhost:9092"),
-            value_serializer=lambda v: json.dumps(v).encode("utf-8")
-        )
+        producer = Producer({
+            'bootstrap.servers': os.getenv("KAFKA_SERVERS", "localhost:9092")
+        })
     return producer
 
 def publish_event(topic: str, payload: dict):
-    future = get_producer().send(topic, payload)
-    try:
-        record_metadata = future.get(timeout=10)  # blocks and waits for ack
-        print(f"[Kafka] Delivered to topic={record_metadata.topic} partition={record_metadata.partition} offset={record_metadata.offset}")
-    except KafkaError as e:
-        print(f"[Kafka] FAILED to deliver message: {e}")
+    def delivery_report(err, msg):
+        if err:
+            print(f"[Kafka] FAILED: {err}")
+        else:
+            print(f"[Kafka] Delivered to topic={msg.topic()} partition={msg.partition()} offset={msg.offset()}")
+
+    get_producer().produce(topic, json.dumps(payload).encode('utf-8'), callback=delivery_report)
+    get_producer().flush()
