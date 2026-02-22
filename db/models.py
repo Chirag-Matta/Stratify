@@ -12,6 +12,13 @@ Base = declarative_base()
 def generate_uuid():
     return str(uuid.uuid4())
 
+class User(Base):
+    __tablename__ = "users"
+
+    userID = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 class Order(Base):
     __tablename__ = "orders"
 

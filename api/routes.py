@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from db.models import Order
 from services.producer import publish_event
 from services.cache import get_user_experiments_cache, set_user_experiments_cache
+from db.models import User, Order
 
 load_dotenv()
 
@@ -25,6 +26,17 @@ def get_db():
         yield db
     finally:
         db.close()
+
+@app.post("/users")
+def register_user(payload: dict, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.user_id == payload["user_id"]).first()
+    if existing:
+        return {"status": "already_exists", "user_id": payload["user_id"]}
+    
+    user = User(user_id=payload["user_id"])
+    db.add(user)
+    db.commit()
+    return {"status": "registered", "user_id": payload["user_id"]}
 
 @app.get("/users/{user_id}/experiments")
 def get_user_experiments(user_id: str, db: Session = Depends(get_db)):

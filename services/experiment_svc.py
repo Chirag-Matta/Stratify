@@ -29,19 +29,23 @@ class ExperimentService:
             self.db.commit()
             self.db.refresh(experiment)
 
-            for seg_id in segmentIDs:
-                self.db.add(
-                    ExperimentSegment(
-                        experimentID=experiment.experimentID,
-                        segmentID=seg_id
-                    )
-                )
-            self.db.commit()
-            return experiment
-
         except IntegrityError:
             self.db.rollback()
-            return self.db.query(Experiment).filter(Experiment.name == name).first()
+            experiment = self.db.query(Experiment).filter(Experiment.name == name).first()
+
+        # link segments — runs whether experiment is new or existing
+        for seg_id in segmentIDs:
+            existing_link = self.db.query(ExperimentSegment).filter(
+                ExperimentSegment.experimentID == experiment.experimentID,
+                ExperimentSegment.segmentID == seg_id
+            ).first()
+            if not existing_link:
+                self.db.add(ExperimentSegment(
+                    experimentID=experiment.experimentID,
+                    segmentID=seg_id
+                ))
+        self.db.commit()
+        return experiment
 
 
     def assign_variant(self, user_id, experiment):
