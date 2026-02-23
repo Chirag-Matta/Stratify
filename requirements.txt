@@ -33,5 +33,3 @@ python-dotenv==1.0.1   # For loading .env files
 
 pytest==8.0.0
 httpx==0.26.0
-
-apscheduler==3.10.4
