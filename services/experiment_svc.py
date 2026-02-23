@@ -13,6 +13,7 @@ from services.banner_mixture import (
     generate_banner_mixture
 )
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
 
 
 class ExperimentService:
@@ -69,33 +70,35 @@ class ExperimentService:
         return experiment.variants[-1]
 
 
+    def _get_active_experiments_with_segments(self):
+        """
+        Single query that fetches all active experiments
+        AND their segment links in one shot via JOIN.
+        Replaces the previous pattern of fetching experiments
+        then lazily loading exp.segments per experiment.
+        """
+        return self.db.query(Experiment)\
+            .options(joinedload(Experiment.segments))\
+            .filter(Experiment.status == "active")\
+            .all()
+
+
     def get_banner_experiments(self, user_id):
-        """
-        Get all banner-based experiments for user.
-        
-        Returns:
-            List of dicts with experiment info and assigned variant
-        """
         segments = self.db.query(UserSegmentMembership)\
             .filter(UserSegmentMembership.user_id == user_id).all()
 
-        segmentIDs = [s.segmentID for s in segments]
+        segmentIDs = set(s.segmentID for s in segments)      # ✅ set for O(1) lookup
 
-        # Get all active experiments
-        experiments = self.db.query(Experiment)\
-            .filter(Experiment.status == "active").all()
+        experiments = self._get_active_experiments_with_segments()  # ✅ single query
 
         banner_experiments = []
 
         for exp in experiments:
-            target_segments = [es.segmentID for es in exp.segments]
-            
-            # Check if user is in any of the target segments
-            if any(s in segmentIDs for s in target_segments):
-                # Assign variant
+            target_segments = {es.segmentID for es in exp.segments}  # already loaded, no query
+
+            if target_segments & segmentIDs:                  # set intersection, O(1)
                 variant = self.assign_variant(user_id, exp)
-                
-                # Only include if this variant has banners
+
                 if isinstance(variant, dict) and "banners" in variant:
                     banner_experiments.append({
                         "experimentID": exp.experimentID,
@@ -105,6 +108,7 @@ class ExperimentService:
                     })
 
         return banner_experiments
+
 
 
     def generate_user_banner_mixture(self, user_id):
@@ -157,24 +161,19 @@ class ExperimentService:
 
 
     def get_user_experiments(self, user_id):
-        """
-        Get all experiments (banner + non-banner) for user.
-        
-        Returns list of experiments with assigned variants.
-        """
         segments = self.db.query(UserSegmentMembership)\
             .filter(UserSegmentMembership.user_id == user_id).all()
 
-        segmentIDs = [s.segmentID for s in segments]
+        segmentIDs = set(s.segmentID for s in segments)      
 
-        experiments = self.db.query(Experiment)\
-            .filter(Experiment.status == "active").all()
+        experiments = self._get_active_experiments_with_segments()  
 
         results = []
 
         for exp in experiments:
-            target_segments = [es.segmentID for es in exp.segments]
-            if any(s in segmentIDs for s in target_segments):
+            target_segments = {es.segmentID for es in exp.segments}  
+
+            if target_segments & segmentIDs:                  
                 variant = self.assign_variant(user_id, exp)
                 results.append({
                     "experimentID": exp.experimentID,

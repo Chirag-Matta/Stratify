@@ -38,40 +38,37 @@ def register_user(payload: dict, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "registered", "user_id": payload["user_id"]}
 
+
 @app.get("/users/{user_id}/experiments")
 def get_user_experiments(user_id: str, db: Session = Depends(get_db)):
-    # check cache first
+    exp_service = ExperimentService(db)
+    seg_service = SegmentService(db)
+
+    # Cache check
     cached = get_user_experiments_cache(user_id)
     if cached is not None:
-        response = {"user_id": user_id, "experiments": cached, "source": "cache"}
-        
-        # Also add banner mixture if available
-        exp_service = ExperimentService(db)
         banner_mixture = exp_service.generate_user_banner_mixture(user_id)
+        response = {"user_id": user_id, "experiments": cached, "source": "cache"}
         if banner_mixture:
             response["banner_mixture"] = banner_mixture
-        
         return response
 
-    # cache miss — compute from Postgres
-    seg_service = SegmentService(db)
-    seg_service.refresh_user_segments(user_id)
+    # If Cache miss — only refresh segments if this user
+    # has never had segments computed (e.g. brand new user)
+    # For all other users, trust that the consumer/cron keeps segments fresh
+    if not seg_service.has_segment_memberships(user_id):
+        seg_service.refresh_user_segments(user_id)
 
-    exp_service = ExperimentService(db)
     experiments = exp_service.get_user_experiments(user_id)
-
-    # Generate banner mixture (cached internally)
     banner_mixture = exp_service.generate_user_banner_mixture(user_id)
 
-    # store experiments in cache
     set_user_experiments_cache(user_id, experiments)
 
     response = {"user_id": user_id, "experiments": experiments, "source": "db"}
-    
     if banner_mixture:
         response["banner_mixture"] = banner_mixture
-
     return response
+
 
 
 @app.post("/segments")
@@ -116,6 +113,7 @@ def place_order(payload: dict, db: Session = Depends(get_db)):
         "city": payload.get("city")
     })
 
+    
     return {"orderID": order.orderID, "status": "placed"}
 
 

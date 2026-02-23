@@ -46,3 +46,10 @@ class SegmentService:
 
         self.db.commit()
         return matched
+
+    def has_segment_memberships(self, user_id: str) -> bool:
+        count = self.db.query(UserSegmentMembership)\
+            .filter(UserSegmentMembership.user_id == user_id)\
+            .limit(1)\
+            .count()
+        return count > 0
