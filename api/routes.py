@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 from db.models import Order, User
 from services.producer import publish_event
 from services.cache import get_user_experiments_cache, set_user_experiments_cache, invalidate_user_cache
+from services.scheduler import scheduler
+from services.dormancy_check import check_user_dormancy
 
 load_dotenv()
 
@@ -19,6 +21,18 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 SessionLocal = create_tables(DATABASE_URL)
 
 app = FastAPI()
+
+DORMANCY_DAYS = 14
+@app.on_event("startup")
+def start_scheduler():
+    scheduler.start()
+    print("[Scheduler] Started")
+
+
+@app.on_event("shutdown")
+def stop_scheduler():
+    scheduler.shutdown()
+    print("[Scheduler] Stopped")
 
 def get_db():
     db = SessionLocal()
@@ -113,7 +127,20 @@ def place_order(payload: dict, db: Session = Depends(get_db)):
         "city": payload.get("city")
     })
 
-    
+    # Schedule dormancy check 14 days from now
+    # Job ID is keyed to user_id — so placing a new order replaces the old job and resets the 14-day clock
+    run_at = datetime.utcnow() + timedelta(days=DORMANCY_DAYS)
+    job_id = f"dormancy:{payload['user_id']}"
+
+    scheduler.add_job(
+        check_user_dormancy,
+        "date",
+        run_date=run_at,
+        args=[payload["user_id"], order.created_at.isoformat()],
+        id=job_id,
+        replace_existing=True
+    )
+
     return {"orderID": order.orderID, "status": "placed"}
 
 
