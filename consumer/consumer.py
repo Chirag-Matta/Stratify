@@ -9,7 +9,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from confluent_kafka import Consumer
 from db.models import create_tables
 from services.segment_svc import SegmentService
-from services.cache import invalidate_user_cache  # was missing
+from services.cache import invalidate_user_cache
+from services.banner_mixture import invalidate_banner_mixture  # NEW IMPORT
 
 SessionLocal = create_tables(os.getenv("DATABASE_URL"))
 
@@ -45,12 +46,16 @@ def main():
         try:
             service = SegmentService(db)
             matched_segments = service.refresh_user_segments(user_id)
+            
+            # Invalidate both caches
             invalidate_user_cache(user_id)
+            invalidate_banner_mixture(user_id)  # NEW
+            
             print(f"[Consumer] User {user_id} now in segments: {matched_segments}")
         except Exception as e:
             print(f"[Consumer] Error processing {user_id}: {e}")
             import traceback
-            traceback.print_exc()  # print full error so nothing is hidden
+            traceback.print_exc()
         finally:
             db.close()
 

@@ -1,12 +1,18 @@
 # services/experiment_svc.py
 
 import hashlib
+import random
+from datetime import datetime
 from db.models import (
     Experiment, ExperimentSegment,
     UserExperimentAssignment, UserSegmentMembership
 )
+from services.banner_mixture import (
+    get_banner_mixture_cache,
+    set_banner_mixture_cache,
+    generate_banner_mixture
+)
 from sqlalchemy.exc import IntegrityError
-
 
 
 class ExperimentService:
@@ -49,6 +55,7 @@ class ExperimentService:
 
 
     def assign_variant(self, user_id, experiment):
+        """Assign variant based on user ID hash."""
         key = f"{user_id}:{experiment.experimentID}"
         bucket = int(hashlib.md5(key.encode()).hexdigest(), 16) % 100
 
@@ -56,9 +63,105 @@ class ExperimentService:
         for variant in experiment.variants:
             cumulative += variant["weight"]
             if bucket < cumulative:
-                return variant["name"]
+                return variant
+        
+        # Fallback to last variant (should not reach here with proper weights)
+        return experiment.variants[-1]
+
+
+    def get_banner_experiments(self, user_id):
+        """
+        Get all banner-based experiments for user.
+        
+        Returns:
+            List of dicts with experiment info and assigned variant
+        """
+        segments = self.db.query(UserSegmentMembership)\
+            .filter(UserSegmentMembership.user_id == user_id).all()
+
+        segmentIDs = [s.segmentID for s in segments]
+
+        # Get all active experiments
+        experiments = self.db.query(Experiment)\
+            .filter(Experiment.status == "active").all()
+
+        banner_experiments = []
+
+        for exp in experiments:
+            target_segments = [es.segmentID for es in exp.segments]
+            
+            # Check if user is in any of the target segments
+            if any(s in segmentIDs for s in target_segments):
+                # Assign variant
+                variant = self.assign_variant(user_id, exp)
+                
+                # Only include if this variant has banners
+                if isinstance(variant, dict) and "banners" in variant:
+                    banner_experiments.append({
+                        "experimentID": exp.experimentID,
+                        "name": exp.name,
+                        "variant_name": variant["name"],
+                        "banners": variant["banners"]
+                    })
+
+        return banner_experiments
+
+
+    def generate_user_banner_mixture(self, user_id):
+        """
+        Generate or retrieve cached banner mixture for user.
+        
+        Algorithm:
+        1. Check cache
+        2. If cache miss, collect all banners from applicable experiments
+        3. Randomly select N banners from pool
+        4. Store in cache with TTL
+        
+        Returns:
+            Dict with banners, assigned_at, expires_at, source_experiments
+            or None if no banner experiments found
+        """
+        # Step 1: Check cache
+        cached_mixture = get_banner_mixture_cache(user_id)
+        if cached_mixture is not None:
+            return cached_mixture
+        
+        # Step 2: Get all applicable banner experiments
+        banner_experiments = self.get_banner_experiments(user_id)
+        
+        if not banner_experiments:
+            # No banner experiments for this user
+            return None
+        
+        # Step 3: Collect all banners from all applicable experiments
+        banner_pool = set()
+        source_info = []
+        
+        for item in banner_experiments:
+            banners = item["banners"]
+            banner_pool.update(banners)
+            source_info.append({
+                "experiment_id": item["experimentID"],
+                "name": item["name"],
+                "variant": item["variant_name"],
+                "contributed_banners": banners
+            })
+        
+        # Step 4: Generate mixture (random selection without replacement)
+        selected_banners = generate_banner_mixture(list(banner_pool))
+        
+        # Step 5: Cache it
+        mixture = set_banner_mixture_cache(user_id, selected_banners, source_info)
+        
+        return mixture
+
 
     def get_user_experiments(self, user_id):
+        """
+        Get all experiments (banner + non-banner) for user.
+        
+        Returns list of experiments with assigned variants.
+        """
         segments = self.db.query(UserSegmentMembership)\
             .filter(UserSegmentMembership.user_id == user_id).all()
 
@@ -75,7 +178,8 @@ class ExperimentService:
                 variant = self.assign_variant(user_id, exp)
                 results.append({
                     "experimentID": exp.experimentID,
-                    "variant": variant
+                    "name": exp.name,
+                    "variant": variant["name"]
                 })
 
         return results

@@ -12,6 +12,7 @@ from sqlalchemy import func, text
 from db.models import create_tables, Order
 from services.segment_svc import SegmentService
 from services.cache import invalidate_user_cache
+from services.banner_mixture import invalidate_banner_mixture  # NEW IMPORT
 
 SessionLocal = create_tables(os.getenv("DATABASE_URL"))
 
@@ -43,7 +44,11 @@ def run():
             try:
                 service = SegmentService(db)
                 matched = service.refresh_user_segments(user_id)
+                
+                # Invalidate both caches
                 invalidate_user_cache(user_id)
+                invalidate_banner_mixture(user_id)  # NEW
+                
                 print(f"[Cron] Refreshed user {user_id} → segments: {matched}")
             except Exception as e:
                 print(f"[Cron] Error for user {user_id}: {e}")
