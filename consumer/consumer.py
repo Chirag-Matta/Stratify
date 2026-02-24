@@ -44,6 +44,7 @@ def main():
 
         db = SessionLocal()
         try:
+            # db.expire_all()
             service = SegmentService(db)
             matched_segments = service.refresh_user_segments(user_id)
             

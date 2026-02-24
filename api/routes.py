@@ -3,6 +3,7 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 import os
+from datetime import datetime, timedelta
 from db.models import create_tables
 from services.segment_svc import SegmentService
 from services.experiment_svc import ExperimentService
@@ -22,7 +23,13 @@ SessionLocal = create_tables(DATABASE_URL)
 
 app = FastAPI()
 
+# api/routes.py
+
 DORMANCY_DAYS = 14
+DORMANCY_SECONDS_TEST = 30  # ✅ toggle this for testing
+TEST_MODE = True             # ✅ flip to False in production
+
+# DORMANCY_SECONDS = 30  # TEMP FOR TESTING
 @app.on_event("startup")
 def start_scheduler():
     scheduler.start()
@@ -127,9 +134,10 @@ def place_order(payload: dict, db: Session = Depends(get_db)):
         "city": payload.get("city")
     })
 
-    # Schedule dormancy check 14 days from now
-    # Job ID is keyed to user_id — so placing a new order replaces the old job and resets the 14-day clock
-    run_at = datetime.utcnow() + timedelta(days=DORMANCY_DAYS)
+    if TEST_MODE:
+        run_at = datetime.utcnow() + timedelta(seconds=DORMANCY_SECONDS_TEST)
+    else:
+        run_at = datetime.utcnow() + timedelta(days=DORMANCY_DAYS)
     job_id = f"dormancy:{payload['user_id']}"
 
     scheduler.add_job(
@@ -187,3 +195,53 @@ def invalidate_user_caches(user_id: str):
 #         "user_id": user_id,
 #         "experiments": experiments
 #     }
+
+@app.post("/test/orders/dormancy")
+def place_order_test_dormancy(payload: dict, db: Session = Depends(get_db)):
+    """
+    Test-only endpoint — places an order and schedules
+    dormancy check after N seconds instead of 14 days.
+    Pass dormancy_check_in_seconds in the body to control delay.
+    Default is 30 seconds.
+    """
+    order = Order(
+        user_id=payload["user_id"],
+        amount=payload["amount"],
+        city=payload.get("city")
+    )
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+
+    invalidate_user_cache(payload["user_id"])
+    invalidate_banner_mixture(payload["user_id"])
+
+    publish_event("order_placed", {
+        "user_id": payload["user_id"],
+        "orderID": order.orderID,
+        "amount": payload["amount"],
+        "city": payload.get("city")
+    })
+
+    delay_seconds = payload.get("dormancy_check_in_seconds", 30)
+    run_at = datetime.utcnow() + timedelta(seconds=delay_seconds)
+    job_id = f"dormancy:{payload['user_id']}"
+
+    scheduler.add_job(
+        check_user_dormancy,
+        trigger="date",
+        run_date=run_at,
+        args=[payload["user_id"], order.created_at.isoformat()],
+        id=job_id,
+        replace_existing=True
+    )
+
+    print(f"[TestEndpoint] Dormancy check for {payload['user_id']} "
+          f"fires in {delay_seconds}s at {run_at.isoformat()}")
+
+    return {
+        "orderID": order.orderID,
+        "status": "placed",
+        "dormancy_check_fires_at": run_at.isoformat(),
+        "dormancy_check_in_seconds": delay_seconds
+    }

@@ -12,4 +12,9 @@ jobstores = {
     )
 }
 
-scheduler = BackgroundScheduler(jobstores=jobstores)
+job_defaults = {
+    "misfire_grace_time": 3600,  # run the job even if up to 1 hour late
+    "coalesce": True,            # if multiple misfires stacked up, run only once
+}
+
+scheduler = BackgroundScheduler(jobstores=jobstores, job_defaults=job_defaults)

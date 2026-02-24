@@ -43,7 +43,9 @@ class UserStatsService:
             .filter(Order.user_id == user_id)\
             .scalar()
 
-        days_since_last_order = (now - last_order).days if last_order else 9999
+        # days_since_last_order = (now - last_order).days if last_order else 9999
+
+        seconds_since_last_order = (now - last_order).total_seconds() if last_order else 999999
 
         # City from most recent order
         latest_order = self.db.query(Order)\
@@ -59,7 +61,8 @@ class UserStatsService:
             "order_count_last_23_days": orders_last_23,
             "order_count_last_12_days": orders_last_12,
             "ltv": float(ltv),
-            "days_since_last_order": days_since_last_order,
+            # "days_since_last_order": days_since_last_order,
+            "seconds_since_last_order": seconds_since_last_order,
             "city": city,
             "is_new_user": total_orders == 0,
         }
