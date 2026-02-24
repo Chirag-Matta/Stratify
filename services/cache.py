@@ -1,5 +1,3 @@
-# services/cache.py
-
 import json
 import os
 import redis

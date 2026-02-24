@@ -1,5 +1,3 @@
-# services/rule_engine.py
-
 def evaluate(rules: dict, user_stats: dict) -> bool:
     if "operator" in rules:
         op = rules["operator"]

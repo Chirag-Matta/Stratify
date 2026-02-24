@@ -16,13 +16,7 @@ BANNER_COUNT = 3  # Number of banners to select
 
 
 def get_banner_mixture_cache(user_id: str) -> Optional[Dict]:
-    """
-    Retrieve cached banner mixture for user.
-    
-    Returns:
-        Dict with banners, assigned_at, expires_at, source_experiments
-        or None if not found/expired
-    """
+
     key = f"user:{user_id}:banner_mixture"
     data = client.get(key)
     if data:
@@ -37,18 +31,8 @@ def set_banner_mixture_cache(
     banners: List[int],
     source_experiments: List[Dict]
 ) -> Dict:
-    """
-    Store banner mixture in cache with TTL.
     
-    Args:
-        user_id: User identifier
-        banners: List of banner IDs [1, 2, 3]
-        source_experiments: List of experiments that contributed
-                           [{"name": "exp1", "variant": "var1"}, ...]
-    
-    Returns:
-        The mixture data that was stored
-    """
+
     key = f"user:{user_id}:banner_mixture"
     
     now = datetime.utcnow()
@@ -79,16 +63,7 @@ def generate_banner_mixture(
     available_banners: List[int],
     target_count: int = BANNER_COUNT
 ) -> List[int]:
-    """
-    Generate random banner mixture from available banners.
-    
-    Args:
-        available_banners: Pool of banner IDs to choose from
-        target_count: Number of banners to select (default 3)
-    
-    Returns:
-        List of selected banner IDs
-    """
+   
     if len(available_banners) == 0:
         return []
     

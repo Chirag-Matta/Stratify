@@ -1,6 +1,6 @@
 # services/segment_svc.py
-
-from db.models import Segment, UserSegmentMembership
+from db.models import Segment, UserSegmentMembership, Order 
+from datetime import datetime, timedelta
 from services.rule_engine import evaluate
 from services.user_stats import UserStatsService
 from sqlalchemy.exc import IntegrityError
@@ -25,6 +25,23 @@ class SegmentService:
 
     def get_all_segments(self):
         return self.db.query(Segment).all()
+
+    def refresh_if_dormant(self, user_id: str, threshold_seconds: int = 30):
+        last_order = self.db.query(Order)\
+            .filter(Order.user_id == user_id)\
+            .order_by(Order.created_at.desc())\
+            .first()
+
+        if last_order is None:
+            return  # no orders, new user — handled separately
+
+        seconds_since = (datetime.utcnow() - last_order.created_at).total_seconds()
+
+        print(f"[SegmentSvc] {user_id} → seconds_since_last_order={seconds_since:.1f}")
+
+        if seconds_since >= threshold_seconds:
+            print(f"[SegmentSvc] {user_id} crossed dormancy threshold — refreshing segments")
+            self.refresh_user_segments(user_id)
 
     def refresh_user_segments(self, user_id):
         stats = UserStatsService(self.db).get_stats(user_id)

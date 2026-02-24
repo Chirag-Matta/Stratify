@@ -1,5 +1,3 @@
-# services/experiment_svc.py
-
 import hashlib
 import random
 from datetime import datetime

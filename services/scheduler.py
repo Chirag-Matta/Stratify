@@ -12,9 +12,12 @@ jobstores = {
     )
 }
 
-job_defaults = {
-    "misfire_grace_time": 3600,  # run the job even if up to 1 hour late
-    "coalesce": True,            # if multiple misfires stacked up, run only once
-}
-
-scheduler = BackgroundScheduler(jobstores=jobstores, job_defaults=job_defaults)
+# Configure scheduler to handle missed jobs gracefully
+scheduler = BackgroundScheduler(
+    jobstores=jobstores,
+    job_defaults={
+        'coalesce': True,  # If multiple runs are missed, combine them into one
+        'max_instances': 1  # Only allow 1 instance of the job at a time
+    },
+    timezone='UTC'
+)
