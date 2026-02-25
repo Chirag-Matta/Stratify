@@ -143,8 +143,7 @@ class ExperimentService:
             banners = item["banners"]
             banner_pool.update(banners)
             source_info.append({
-                "experiment_id": item["experimentID"],
-                "name": item["name"],
+                "experiment_name": item["name"],
                 "variant": item["variant_name"],
                 "contributed_banners": banners
             })
