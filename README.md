@@ -296,7 +296,7 @@ Clears both experiment and banner mixture caches.
 ### 1. Clone & install dependencies
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/Chirag-Matta/Stratify.git
 cd Stratify
 pip install -r requirements.txt
 ```
