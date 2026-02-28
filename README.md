@@ -456,24 +456,6 @@ curl -X GET "http://localhost:8000/users/user_lisa_new/experiments" | jq '.exper
 # Should return: 2 (new experiments after order)
 ```
 
-### Full Test Suite
-
-For detailed testing instructions, refer to [**COMPLETE_TESTING_GUIDE_FOR_MENTORS.md**](./COMPLETE_TESTING_GUIDE_FOR_MENTORS.md)
-
-Key tests include:
-1. ✅ Register users
-2. ✅ Cache hits/misses
-3. ✅ New user segmentation
-4. ✅ Segment creation
-5. ✅ Experiment creation
-6. ✅ Real-time order processing
-7. ✅ Automatic cache invalidation
-8. ✅ Deterministic variant assignment
-9. ✅ Banner mixture selection
-10. ✅ Dormancy check scheduling
-11. ✅ Multi-user segment targeting
-12. ✅ Manual cache invalidation
-
 ---
 
 ## Running the System
